@@ -21,3 +21,7 @@ DeepSeek 🐋 基于 [@CSDN_拜阳](https://blog.csdn.net/bby1987/article/detail
 2. 对英文/汉字/数字/特殊符号的分类提取
 3. 正确地处理大小写
 4. 可以在控制台追踪生成结果
+### 运行环境?
+Fonts Printer 使用了大量的 Turbowarp 拓展库。因此它 **完全不能** 在 Scratch 3.0 上运行。  
+  
+TTF2Png.py 需要安装 **依赖库** Fonttools 和 Pillow, 您可以通过: **`pip install Fonttools pillow`** 进行安装。
