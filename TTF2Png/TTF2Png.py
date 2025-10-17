@@ -11,7 +11,7 @@ class FontExtractorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("字体字符提取工具")
-        self.root.geometry("600x550")
+        self.root.geometry("600x600")
 
         self.setup_ui()
 
@@ -90,19 +90,39 @@ class FontExtractorApp:
         ttk.Checkbutton(chars_frame, text="仅常用汉字", variable=self.extract_common_chinese,
                         command=self.toggle_common_chinese).grid(row=1, column=2, sticky=tk.W, pady=2)
 
-        # 常用汉字级别选择
-        common_chinese_frame = ttk.Frame(main_frame)
-        common_chinese_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
+        # 常用汉字级别选择 - 已删除选择列表，保留复选框功能
 
-        ttk.Label(common_chinese_frame, text="常用汉字级别:").pack(side=tk.LEFT)
-        self.common_chinese_level = tk.StringVar(value="常用3500")
-        level_combo = ttk.Combobox(common_chinese_frame, textvariable=self.common_chinese_level,
-                                   values=["常用3500"], width=20, state="readonly")
-        level_combo.pack(side=tk.LEFT, padx=(5, 0))
+        # 自定义字符提取
+        custom_frame = ttk.LabelFrame(main_frame, text="自定义字符提取", padding="5")
+        custom_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
 
-        # 初始状态
-        level_combo.configure(state='disabled')
-        self.common_chinese_level_combo = level_combo
+        # 单字符输入
+        ttk.Label(custom_frame, text="单个字符:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.single_char = tk.StringVar()
+        ttk.Entry(custom_frame, textvariable=self.single_char, width=10).grid(row=0, column=1, sticky=tk.W, pady=2,
+                                                                              padx=(5, 0))
+        ttk.Button(custom_frame, text="添加到列表", command=self.add_to_list).grid(row=0, column=2, sticky=tk.W, pady=2,
+                                                                                   padx=(5, 0))
+
+        # 字符列表
+        ttk.Label(custom_frame, text="字符列表:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        list_frame = ttk.Frame(custom_frame)
+        list_frame.grid(row=1, column=1, columnspan=2, sticky=(tk.W, tk.E), pady=2)
+
+        self.char_listbox = tk.Listbox(list_frame, height=4)
+        self.char_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.char_listbox.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.char_listbox.config(yscrollcommand=scrollbar.set)
+
+        # 列表操作按钮
+        list_buttons_frame = ttk.Frame(custom_frame)
+        list_buttons_frame.grid(row=2, column=1, columnspan=2, sticky=tk.W, pady=2)
+
+        ttk.Button(list_buttons_frame, text="删除选中", command=self.delete_selected).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(list_buttons_frame, text="清空列表", command=self.clear_list).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(list_buttons_frame, text="提取列表", command=self.extract_list).pack(side=tk.LEFT)
 
         # 跳过已存在文件
         self.skip_existing = tk.BooleanVar(value=True)
@@ -155,11 +175,8 @@ class FontExtractorApp:
             self.extract_digits.set(True)
             self.extract_symbols.set(True)
             self.extract_common_chinese.set(False)
-            self.common_chinese_level_combo.configure(state='disabled')
         else:
             state = 'normal'
-            if not self.extract_common_chinese.get():
-                self.common_chinese_level_combo.configure(state='disabled')
 
         for widget in self.root.winfo_children():
             if isinstance(widget, ttk.Checkbutton):
@@ -174,7 +191,6 @@ class FontExtractorApp:
             self.extract_digits.set(False)
             self.extract_symbols.set(False)
             self.extract_all.set(False)
-            self.common_chinese_level_combo.configure(state='readonly')
 
             for widget in self.root.winfo_children():
                 if isinstance(widget, ttk.Checkbutton):
@@ -185,7 +201,70 @@ class FontExtractorApp:
             for widget in self.root.winfo_children():
                 if isinstance(widget, ttk.Checkbutton):
                     widget.configure(state='normal')
-            self.common_chinese_level_combo.configure(state='disabled')
+
+    def add_to_list(self):
+        char = self.single_char.get().strip()
+        if char:
+            # 如果输入多个字符，只取第一个
+            if len(char) > 1:
+                char = char[0]
+                self.single_char.set(char)
+
+            # 检查是否已存在
+            existing_chars = self.char_listbox.get(0, tk.END)
+            if char not in existing_chars:
+                self.char_listbox.insert(tk.END, char)
+                self.single_char.set("")  # 清空输入框
+            else:
+                messagebox.showwarning("警告", f"字符 '{char}' 已存在于列表中")
+        else:
+            messagebox.showwarning("警告", "请输入字符")
+
+    def delete_selected(self):
+        selected = self.char_listbox.curselection()
+        if selected:
+            self.char_listbox.delete(selected[0])
+
+    def clear_list(self):
+        self.char_listbox.delete(0, tk.END)
+
+    def extract_list(self):
+        chars = self.char_listbox.get(0, tk.END)
+        if not chars:
+            messagebox.showwarning("警告", "字符列表为空")
+            return
+
+        if not self.font_path.get():
+            messagebox.showerror("错误", "请选择字体文件")
+            return
+
+        if not self.output_path.get():
+            messagebox.showerror("错误", "请选择输出目录")
+            return
+
+        try:
+            self.status.set("正在提取自定义字符...")
+            self.root.update()
+
+            # 调用自定义字符提取函数
+            extract_custom_chars(
+                font_file=self.font_path.get(),
+                chars_list=list(chars),
+                font_size=self.font_size.get(),
+                image_size=self.image_size.get(),
+                out_folder=self.output_path.get(),
+                name_mode=self.name_mode.get(),
+                image_extension=self.image_format.get(),
+                is_skip=self.skip_existing.get(),
+                progress_callback=self.update_progress
+            )
+
+            self.status.set("自定义字符提取完成！")
+            messagebox.showinfo("完成", "自定义字符提取完成！")
+
+        except Exception as e:
+            self.status.set(f"错误: {str(e)}")
+            messagebox.showerror("错误", f"提取过程中出现错误:\n{str(e)}")
 
     def clear_status(self):
         self.status.set("准备就绪")
@@ -217,7 +296,7 @@ class FontExtractorApp:
                 extract_symbols=self.extract_symbols.get(),
                 extract_all=self.extract_all.get(),
                 extract_common_chinese=self.extract_common_chinese.get(),
-                common_chinese_level=self.common_chinese_level.get(),
+                common_chinese_level="常用3500",  # 固定值
                 is_skip=self.skip_existing.get(),
                 progress_callback=self.update_progress
             )
@@ -237,421 +316,81 @@ class FontExtractorApp:
 
 def get_precise_common_chinese_3500():
     """精确的3500个常用汉字列表，按部首排列，无重复"""
-
-    # 按照国家语委《通用规范汉字表》一级字表（3500字）整理
-    # 按部首顺序排列
-    precise_chinese_3500 = [
-        # 一部
-        "一丁七万丈三上下不与丐丑专且世丘丙业丛东丝丞丢两严丧个丫中丰串临丸丹为主丽举",
-        # 丨部
-        "丫中丰串临",
-        # 丿部
-        "九乃久么乏乘乙乜也习乡书买乱乳乾了予争事二于云互五井些亚亟亡交亥亦产亨亩享京亭亮亲",
-        # 乙部
-        "乙乜也习乡书买乱乳乾了予争事",
-        # 二部
-        "二于云互五井些亚亟亡交亥亦产亨亩享京亭亮亲",
-        # 亻部 (单人旁)
-        "仁什仆仇今介仍从仑仓他仗付仙代令以仪们仰件价任份仿企伊伍伏优伐延仲件任价伦份仰仿伙伪",
-        "似但伸作伯伶佣低你住位伴伺佛伽役何余佛作佣佩依便俩修俏保促俄俭俗俘信侵侯俊待",
-        # 儿部
-        "儿兀允元兄光先兆克免兑兔党兜兢",
-        # 入部
-        "入全两内丙肉",
-        # 八部
-        "八公六共兵其具典养兼兽冀",
-        # 冂部
-        "内冈冉册再网同肉",
-        # 冖部
-        "写军农冠冤冥幂",
-        # 冫部
-        "冰冲决况冷冻净凄凉凌减凑凝",
-        # 几部
-        "几凡凤凭凯凳",
-        # 凵部
-        "凶出击凸凹函",
-        # 刀部
-        "刀刃分切刊刑划列则刚创初删判别利刮到制刷券刹刺刻剁剂剃前剑剔剥剧剩剪副割劈",
-        # 力部
-        "力办功加务动助努劫励劳势勃勇勉勋勤募勾勿包匆匈",
-        # 勹部
-        "勾勿包匆匈",
-        # 匕部
-        "匕化北匙",
-        # 匚部
-        "区匹巨匝医匪",
-        # 匸部
-        "区匹巨匝医匪",
-        # 十部
-        "十千午升半华协卑卒卓单卖南博卜占卡卢卦",
-        # 卜部
-        "卜占卡卢卦",
-        # 卩部
-        "卫印却即卷卸卿",
-        # 厂部
-        "厂厅历压厌厕厚原厢厦厨",
-        # 厶部
-        "私允去参能",
-        # 又部
-        "又叉友反取受叔叛难",
-        # 口部
-        "口古句另只叫召叭叮可台史右叶号司叹叽吁吃各合吉吊同名后向吓吐哇品响哈哥哦啊",
-        "啦啪喀喂喜喝喧喳嘿器嚷囚四回因团园围困图固国圃圆",
-        # 囗部
-        "囚四回因团园围困图固国圃圆",
-        # 土部
-        "土圣在地场块坚坡坤坦型城域培基堂堆堕堡堤塔塞境增壁",
-        # 士部
-        "士壮声处备复夏",
-        # 夕部
-        "夕外多夜够",
-        # 大部
-        "大天太夫央失头奇奉奏契奔奖套奢奥",
-        # 女部
-        "女奴奶她好如妇妈妙妥妨妹妻姐姑姓始委妮娜娃姨姻娇婆婚婶媒嫁嫩媳嫂嫌嬉",
-        # 子部
-        "子孔孕存孝学孩孙孤",
-        # 宀部
-        "宁它宅宇守安完宏宗官定宜宝实宠审客宣室宫宪害宽家宵容宾宿寂寄密富寒寓寞察",
-        # 寸部
-        "寸对寻导寿封耐尉尊",
-        # 小部
-        "小少尔尘尚尝就",
-        # 尢部
-        "尤就尴",
-        # 尸部
-        "尸尺尼尽层屁尿尾局居屈届屋屏屑展属屠屡履",
-        # 屮部
-        "屯山屿岁岂岗岸岩岭岳峙峡峰峻崇崎崖崩崭嵌巍川州巡巢工左巧巨巩巫差己已巴巷",
-        # 山部
-        "山屿岁岂岗岸岩岭岳峙峡峰峻崇崎崖崩崭嵌巍",
-        # 川部
-        "川州巡",
-        # 工部
-        "工左巧巨巩巫差",
-        # 己部
-        "己已巴巷",
-        # 巾部
-        "巾市布帅师希帐帕帖帘帚带帮帧帽幕幢",
-        # 干部
-        "干平年并幸干",
-        # 幺部
-        "幻幼幽",
-        # 广部
-        "广庄庆应床库底店庙府庞废度座庭康庸廉廊廓",
-        # 廴部
-        "延建",
-        # 廾部
-        "开异弃弄弊",
-        # 弋部
-        "弋式贰",
-        # 弓部
-        "弓引弛弟张弦弧弯弱弹强粥",
-        # 彐部
-        "归当录彗",
-        # 彡部
-        "形彩雕",
-        # 彳部
-        "彷役往征待很律徒得徘御循微德徽",
-        # 心部
-        "心必忆忍志忘忙忠忧快性怕怪怜思怡怨总恋恒恕恰恨悟悄悔悦悬情惜惭惧惕惊惨惯惑惫愧愿慈慌慎慕慢慧慨慰憎憾懈应",
-        # 戈部
-        "戈戍戏我或战戚截戮",
-        # 户部
-        "户房所扇",
-        # 手部
-        "手才扎扑扒打扔托扛扣执扫扬扭扮扯扰扳扶批扼找承技抄把抑抓投抗折抚抛抢护报担押抽拐拖拍顶拆拥抵拘抱拉拦拌拧",
-        "拨择拾拿持挂指按挑挣挤拼挖按挥挪振挺挽捂捌捅捆捉捍捐损捡换捣捧据捷捺掀掂授掉排掏掠掂控探接推掩措描提插握",
-        "揣揉斯",
-        # 支部
-        "支收改攻放政故效敌敏救教敛敢散敬敞敢敦斑",
-        # 文部
-        "文刘齐斋斌",
-        # 斗部
-        "斗料斜",
-        # 斤部
-        "斤斥斧斩断斯",
-        # 方部
-        "方无既",
-        # 日部
-        "日旦旧早旬旱时旺昂明昏易春显映星昨昭是昼显晃晋晒晓晕晚晨普景晴晶智晾暂暑暖暗暇暮暴曙",
-        # 曰部
-        "曰曲更曾替最",
-        # 月部
-        "月有朋服朗望朝期",
-        # 木部
-        "木未末本札术朱朴朵机权朽材村杖杜束条来杨杭杯杰松板构析林果枝枢枣枪枫架柏某染柱柿栏树柔查柬",
-        # 欠部
-        "欠次欢欣欧欲欺",
-        # 止部
-        "止正此步武歧歪",
-        # 歹部
-        "歹死歼殃殊残殖",
-        # 殳部
-        "殴段殷殿",
-        # 毋部
-        "毋母每毒",
-        # 比部
-        "比毕毙",
-        # 毛部
-        "毛毫毯",
-        # 氏部
-        "氏民",
-        # 气部
-        "气氛氧氮",
-        # 水部
-        "水永求汇汉汗污江池汤汪汶汽沃沉沫浅法泄河沾泪油泊沿泡注泻泳泥沸波泼泽治洁洪洒浇浊洞测洗活派流润浪浸涨烫",
-        "涌",
-        # 火部
-        "火灭灯灰灵灶灼灿炉炎炒炊炙炫炬炭炮炸点炼炽烂烈烊烘烦烧烛烟烙烩烫烬热烹焕焙焚焦焰然煤照煮熙熊熟燃燎燕爆",
-        # 爪部
-        "爪爬爱爵",
-        # 父部
-        "父爷爸爹",
-        # 爻部
-        "爽",
-        # 片部
-        "片版牌",
-        # 牙部
-        "牙穿",
-        # 牛部
-        "牛牟牧物牲牵特牺",
-        # 犬部
-        "犬犯状狂犹狐狗狠独狭狮狱狼猎猛猩猪猫献猴猾",
-        # 玄部
-        "玄率",
-        # 玉部
-        "玉王玛玩环现玫玻珍玲珊玻珠班球理琉琅琢琳琴琵琶琼瑕瑟瑞瑰瑙璃璋璞",
-        # 瓜部
-        "瓜瓣",
-        # 瓦部
-        "瓦瓶瓷",
-        # 甘部
-        "甘某甜",
-        # 生部
-        "生甥",
-        # 用部
-        "用甩甫甬",
-        # 田部
-        "田由甲申电男画畅界畏留略累畴",
-        # 疋部
-        "疏疑",
-        # 疒部
-        "疔疗疚疤疫疮疯疱疴病症疼疾痂痊痒痕痛痫痤痴痹瘟瘤瘦瘸瘾",
-        # 癶部
-        "登发",
-        # 白部
-        "白的百皂的皇皆皓",
-        # 皮部
-        "皮皱",
-        # 皿部
-        "皿盆盈益盏监盒盖盗盛盟",
-        # 目部
-        "目盯盲直相省眉看真眠眼着睁眯睛睡督睬瞄睹瞄睫睬瞅瞬瞳瞧瞻",
-        # 矛部
-        "矛柔矜",
-        # 矢部
-        "矢知矩短矮",
-        # 石部
-        "石矿码研砖砧破础硅硕硬确碑碗碘碰碳磁磨磷",
-        # 示部
-        "示社祖神祥祸福",
-        # 内部
-        "内",
-        # 禾部
-        "禾秀私秉秋科秒种租积称移秽税稠稳稿稼穆",
-        # 穴部
-        "穴穷空穿突窃窍窑窗窜",
-        # 立部
-        "立站竞童竭端",
-        # 竹部
-        "竹竿笑笔笛符第等策答筋简算筷筹签简篇篮籍",
-        # 米部
-        "米类粉粒粗粘粥粮粹糊糖糕糟",
-        # 糸部
-        "系紧素索紫累细终经结给络绝统绣继绩绪续绳维绵绷绸综绿缀缅缆缉缓编缘缚缝缠缩缭缴",
-        # 缶部
-        "缶缸缺",
-        # 网部
-        "网罗罚罢罩罪置署",
-        # 羊部
-        "羊美羞群羹",
-        # 羽部
-        "羽翅翁翘翔翩",
-        # 老部
-        "老考者",
-        # 而部
-        "而要耐",
-        # 耒部
-        "耒耕耗",
-        # 耳部
-        "耳耽耿聊聋职联聘聚",
-        # 聿部
-        "聿肃肆",
-        # 肉部
-        "肉肋肌肝肚肠股肢肥肩肯育肺肾肿胃胆背胎胞胖脉脊脑脚脱脸脾腊腔腹腿腰腥腮膜膝臀臂臊",
-        # 臣部
-        "臣卧",
-        # 自部
-        "自臭",
-        # 至部
-        "至致",
-        # 臼部
-        "臼舀",
-        # 舌部
-        "舌乱舍舒",
-        # 舛部
-        "舛舞",
-        # 舟部
-        "舟航舰艇",
-        # 艮部
-        "艮良艰",
-        # 色部
-        "色艳",
-        # 艸部
-        "艸艺节芋芍芒芙芜芦苇芽花芹芥芬苍芳芯苦若茂苹苗英范茄茎茅茶草茵荷获莓莉莲莫莱莹莺莽菇菊菜",
-        "菠营萧萨落萱葛董葡葱葵",
-        # 虍部
-        "虎虏虐",
-        # 虫部
-        "虫虱虽虾蚁蚂蚊蚕蛊蛇蛆蛋蛙蛛蛤蛮蛔蜓蜓蜂蜗蜘蜜蝇蝴蝶螃融螳蟀蟋蟀蟑蟆蟹",
-        # 血部
-        "血众",
-        # 行部
-        "行衍街衡",
-        # 衣部
-        "衣补表衫衬衰衷袋裁裂装裆裔",
-        # 西部
-        "西要覆",
-        # 见部
-        "见规视览觉",
-        # 角部
-        "角解",
-        # 言部
-        "言誉警",
-        # 谷部
-        "谷欲",
-        # 豆部
-        "豆岂登",
-        # 豕部
-        "豕象",
-        # 豸部
-        "豸豹貌",
-        # 贝部
-        "贝贞负财责贤败货质贩贪贫贬购贮贯贱贴贵贷贸费贺贼贿赁赂赃资赌赎赏赐赔赖赛",
-        # 走部
-        "走赴起超越",
-        # 足部
-        "足趴距趾跃跑跌跋跚跳践踏踩踪蹋蹈蹦蹬",
-        # 身部
-        "身躲躺",
-        # 车部
-        "车轧轨转轮软轰较辅辆辈辉辐辑输",
-        # 辛部
-        "辛辜辞辣",
-        # 辰部
-        "辰辱",
-        # 辵部
-        "辵边达迁过迈迎运近返还这进远违连迟迫述迷迹追退送适逃逆选逊透逐递通逛逢逮逸逻逼遇遁遂道遗遛避",
-        # 邑部
-        "邑那邦邪邮邻郁郊部都",
-        # 酉部
-        "酉酒配酗酬醉醋醒",
-        # 采部
-        "采释",
-        # 里部
-        "里重野量",
-        # 金部
-        "金针钉钓钏钙钝钞钟钢钥钦钩钮钱钳钻铁铃铅铐银铸铺链销锁锄锋锐错锡锣锤锦键锯镇镜镐镊镰",
-        # 长部
-        "长",
-        # 门部
-        "门闩闪闭问闯闲间闷闸闹闺闻闽阀阁阅阉阎阔阑",
-        # 阜部
-        "阜队防阳阴阵阶阻阿附际陆陈降限陡院除险陪陵陶陷随隅隆隐隔隙",
-        # 隶部
-        "隶",
-        # 隹部
-        "隹难雀集雄雅雇雌雕",
-        # 雨部
-        "雨雪雳零雾雹雷需霆震霉霜霞露",
-        # 青部
-        "青静",
-        # 非部
-        "非靠",
-        # 面部
-        "面",
-        # 革部
-        "革靴靶鞠",
-        # 韦部
-        "韦韧",
-        # 韭部
-        "韭",
-        # 音部
-        "音章竟意",
-        # 页部
-        "页顶顷项顺须顽顾顿颁颂预领颇颈颊频题颜额颠颤",
-        # 风部
-        "风飘",
-        # 飞部
-        "飞",
-        # 食部
-        "食饥饭饮饲饱饰饼饵饺饿馆馊馋",
-        # 首部
-        "首",
-        # 香部
-        "香",
-        # 马部
-        "马驭驰驱驳驴驹驾驶驼驻驿骂骄骆骇骋骏骑骚骡",
-        # 骨部
-        "骨骼髓",
-        # 高部
-        "高",
-        # 髟部
-        "髟鬓",
-        # 斗部
-        "斗",
-        # 鬯部
-        "鬯",
-        # 鬲部
-        "鬲",
-        # 鬼部
-        "鬼魂魅魔",
-        # 鱼部
-        "鱼鲁鲜鲸鳄",
-        # 鸟部
-        "鸟鸡鸣鸥鸦鸭鸯鸽鹅鹊鹏",
-        # 卤部
-        "卤",
-        # 鹿部
-        "鹿麟",
-        # 麦部
-        "麦",
-        # 麻部
-        "麻",
-        # 黄部
-        "黄",
-        # 黍部
-        "黍",
-        # 黑部
-        "黑默黔点",
-        # 黹部
-        "黹",
-        # 鼡部
-        "鼠",
-        # 鼻部
-        "鼻",
-        # 齐部
-        "齐",
-        # 齿部
-        "齿龄",
-        # 龙部
-        "龙",
-        # 龟部
-        "龟",
-        # 龠部
-        "龠"
-    ]
+    precise_chinese_3500 = ["一丁七万丈三上下不与丐丑专且世丘丙业丛东丝丞丢两严丧个丫中丰串临丸丹为主丽举",
+                            "丫中丰串临",
+                            "九乃久么乏乘乙乜也习乡书买乱乳乾了予争事二于云互五井些亚亟亡交亥亦产亨亩享京亭亮亲",
+                            "乙乜也习乡书买乱乳乾了予争事", "二于云互五井些亚亟亡交亥亦产亨亩享京亭亮亲",
+                            "仁什仆仇今介仍从仑仓他仗付仙代令以仪们仰件价任份仿企伊伍伏优伐延仲件任价伦份仰仿伙伪",
+                            "似但伸作伯伶佣低你住位伴伺佛伽役何余佛作佣佩依便俩修俏保促俄俭俗俘信侵侯俊待",
+                            "儿兀允元兄光先兆克免兑兔党兜兢", "入全两内丙肉", "八公六共兵其具典养兼兽冀",
+                            "内冈冉册再网同肉", "写军农冠冤冥幂", "冰冲决况冷冻净凄凉凌减凑凝", "几凡凤凭凯凳",
+                            "凶出击凸凹函",
+                            "刀刃分切刊刑划列则刚创初删判别利刮到制刷券刹刺刻剁剂剃前剑剔剥剧剩剪副割劈",
+                            "力办功加务动助努劫励劳势勃勇勉勋勤募勾勿包匆匈", "勾勿包匆匈", "匕化北匙", "区匹巨匝医匪",
+                            "区匹巨匝医匪", "十千午升半华协卑卒卓单卖南博卜占卡卢卦", "卜占卡卢卦", "卫印却即卷卸卿",
+                            "厂厅历压厌厕厚原厢厦厨", "私允去参能", "又叉友反取受叔叛难",
+                            "口古句另只叫召叭叮可台史右叶号司叹叽吁吃各合吉吊同名后向吓吐哇品响哈哥哦啊",
+                            "啦啪喀喂喜喝喧喳嘿器嚷囚四回因团园围困图固国圃圆", "囚四回因团园围困图固国圃圆",
+                            "土圣在地场块坚坡坤坦型城域培基堂堆堕堡堤塔塞境增壁", "士壮声处备复夏", "夕外多夜够",
+                            "大天太夫央失头奇奉奏契奔奖套奢奥",
+                            "女奴奶她好如妇妈妙妥妨妹妻姐姑姓始委妮娜娃姨姻娇婆婚婶媒嫁嫩媳嫂嫌嬉",
+                            "子孔孕存孝学孩孙孤",
+                            "宁它宅宇守安完宏宗官定宜宝实宠审客宣室宫宪害宽家宵容宾宿寂寄密富寒寓寞察",
+                            "寸对寻导寿封耐尉尊", "小少尔尘尚尝就", "尤就尴",
+                            "尸尺尼尽层屁尿尾局居屈届屋屏屑展属屠屡履",
+                            "屯山屿岁岂岗岸岩岭岳峙峡峰峻崇崎崖崩崭嵌巍川州巡巢工左巧巨巩巫差己已巴巷",
+                            "山屿岁岂岗岸岩岭岳峙峡峰峻崇崎崖崩崭嵌巍", "川州巡", "工左巧巨巩巫差", "己已巴巷",
+                            "巾市布帅师希帐帕帖帘帚带帮帧帽幕幢", "干平年并幸干", "幻幼幽",
+                            "广庄庆应床库底店庙府庞废度座庭康庸廉廊廓", "延建", "开异弃弄弊", "弋式贰",
+                            "弓引弛弟张弦弧弯弱弹强粥", "归当录彗", "形彩雕", "彷役往征待很律徒得徘御循微德徽",
+                            "心必忆忍志忘忙忠忧快性怕怪怜思怡怨总恋恒恕恰恨悟悄悔悦悬情惜惭惧惕惊惨惯惫愧愿慈慌慎慕慢慧慨慰憎憾懈应",
+                            "戈戍戏我或战戚截戮", "户房所扇",
+                            "手才扎扑扒打扔托扛扣执扫扬扭扮扯扰扳扶批扼找承技抄把抑抓投抗折抚抛抢护报担押抽拐拖拍顶拆拥抵拘抱拉拦拌拧",
+                            "拨择拾拿持挂指按挑挣挤拼挖按挥挪振挺挽捂捌捅捆捉捍捐损捡换捣捧据捷捺掀掂授掉排掏掠掂控探接推掩措描提插握",
+                            "揣揉斯", "支收改攻放政故效敌敏救教敛敢散敬敞敢敦斑", "文刘齐斋斌", "斗料斜",
+                            "斤斥斧斩断斯", "方无既",
+                            "日旦旧早旬旱时旺昂明昏易春显映星昨昭是昼显晃晋晒晓晕晚晨普景晴晶智晾暂暑暖暗暇暮暴曙",
+                            "曰曲更曾替最", "月有朋服朗望朝期",
+                            "木未末本札术朱朴朵机权朽材村杖杜束条来杨杭杯杰松板构析林果枝枢枣枪枫架柏某染柱柿栏树柔查柬",
+                            "欠次欢欣欧欲欺", "止正此步武歧歪", "歹死歼殃殊残殖", "殴段殷殿", "毋母每毒", "比毕毙",
+                            "毛毫毯", "氏民", "气氛氧氮",
+                            "水永求汇汉汗污江池汤汪汶汽沃沉沫浅法泄河沾泪油泊沿泡注泻泳泥沸波泼泽治洁洪洒浇浊洞测洗活派流润浪浸涨烫",
+                            "涌",
+                            "火灭灯灰灵灶灼灿炉炎炒炊炙炫炬炭炮炸点炼炽烂烈烊烘烦烧烛烟烙烩烫烬热烹焕焙焚焦焰然煤照煮熙熊熟燃燎燕爆",
+                            "爪爬爱爵", "父爷爸爹", "爽", "片版牌", "牙穿", "牛牟牧物牲牵特牺",
+                            "犬犯状狂犹狐狗狠独狭狮狱狼猎猛猩猪猫献猴猾", "玄率",
+                            "玉王玛玩环现玫玻珍玲珊玻珠班球理琉琅琢琳琴琵琶琼瑕瑟瑞瑰瑙璃璋璞", "瓜瓣", "瓦瓶瓷",
+                            "甘某甜", "生甥", "用甩甫甬", "田由甲申电男画畅界畏留略累畴", "疏疑",
+                            "疔疗疚疤疫疮疯疱疴病症疼疾痂痊痒痕痛痫痤痴痹瘟瘤瘦瘸瘾", "登发", "白的百皂的皇皆皓",
+                            "皮皱", "皿盆盈益盏监盒盖盗盛盟",
+                            "目盯盲直相省眉看真眠眼着睁眯睛睡督睬瞄睹瞄睫睬瞅瞬瞳瞧瞻", "矛柔矜", "矢知矩短矮",
+                            "石矿码研砖砧破础硅硕硬确碑碗碘碰碳磁磨磷", "示社祖神祥祸福", "内",
+                            "禾秀私秉秋科秒种租积称移秽税稠稳稿稼穆", "穴穷空穿突窃窍窑窗窜", "立站竞童竭端",
+                            "竹竿笑笔笛符第等策答筋简算筷筹签简篇篮籍", "米类粉粒粗粘粥粮粹糊糖糕糟",
+                            "系紧素索紫累细终经结给络绝统绣继绩绪续绳维绵绷绸综绿缀缅缆缉缓编缘缚缝缠缩缭缴", "缶缸缺",
+                            "网罗罚罢罩罪置署", "羊美羞群羹", "羽翅翁翘翔翩", "老考者", "而要耐", "耒耕耗",
+                            "耳耽耿聊聋职联聘聚", "聿肃肆",
+                            "肉肋肌肝肚肠股肢肥肩肯育肺肾肿胃胆背胎胞胖脉脊脑脚脱脸脾腊腔腹腿腰腥腮膜膝臀臂臊", "臣卧",
+                            "自臭", "至致", "臼舀", "舌乱舍舒", "舛舞", "舟航舰艇", "艮良艰", "色艳",
+                            "艸艺节芋芍芒芙芜芦苇芽花芹芥芬苍芳芯苦若茂苹苗英范茄茎茅茶草茵荷获莓莉莲莫莱莹莺莽菇菊菜",
+                            "菠营萧萨落萱葛董葡葱葵", "虎虏虐",
+                            "虫虱虽虾蚁蚂蚊蚕蛊蛇蛆蛋蛙蛛蛤蛮蛔蜓蜓蜂蜗蜘蜜蝇蝴蝶螃融螳蟀蟋蟀蟑蟆蟹", "血众",
+                            "行衍街衡", "衣补表衫衬衰衷袋裁裂装裆裔", "西要覆", "见规视览觉", "角解", "言誉警", "谷欲",
+                            "豆岂登", "豕象", "豸豹貌",
+                            "贝贞负财责贤败货质贩贪贫贬购贮贯贱贴贵贷贸费贺贼贿赁赂赃资赌赎赏赐赔赖赛", "走赴起超越",
+                            "足趴距趾跃跑跌跋跚跳践踏踩踪蹋蹈蹦蹬", "身躲躺", "车轧轨转轮软轰较辅辆辈辉辐辑输",
+                            "辛辜辞辣", "辰辱",
+                            "辵边达迁过迈迎运近返还这进远违连迟迫述迷迹追退送适逃逆选逊透逐递通逛逢逮逸逻逼遇遁遂道遗遛避",
+                            "邑那邦邪邮邻郁郊部都", "酉酒配酗酬醉醋醒", "采释", "里重野量",
+                            "金针钉钓钏钙钝钞钟钢钥钦钩钮钱钳钻铁铃铅铐银铸铺链销锁锄锋锐错锡锣锤锦键锯镇镜镐镊镰",
+                            "长", "门闩闪闭问闯闲间闷闸闹闺闻闽阀阁阅阉阎阔阑",
+                            "阜队防阳阴阵阶阻阿附际陆陈降限陡院除险陪陵陶陷随隅隆隐隔隙", "隶", "隹难雀集雄雅雇雌雕",
+                            "雨雪雳零雾雹雷需霆震霉霜霞露", "青静", "非靠", "面", "革靴靶鞠", "韦韧", "韭", "音章竟意",
+                            "页顶顷项顺须顽顾顿颁颂预领颇颈颊频题颜额颠颤", "风飘", "飞",
+                            "食饥饭饮饲饱饰饼饵饺饿馆馊馋", "首", "香", "马驭驰驱驳驴驹驾驶驼驻驿骂骄骆骇骋骏骑骚骡",
+                            "骨骼髓", "高", "髟鬓", "斗", "鬯", "鬲", "鬼魂魅魔", "鱼鲁鲜鲸鳄",
+                            "鸟鸡鸣鸥鸦鸭鸯鸽鹅鹊鹏", "卤", "鹿麟", "麦", "麻", "黄", "黍", "黑默黔点", "黹", "鼠",
+                            "鼻", "齐", "齿龄", "龙", "龟", "龠"]
     # 将所有字符串连接成一个字符串，然后转换为字符列表
     all_chars = ""
     for group in precise_chinese_3500:
@@ -811,6 +550,71 @@ def decimal_to_hex(decimal_unicode, prefix='uni'):
     if is_single_code:
         hex_unicode = hex_unicode[0]
     return hex_unicode
+
+
+def extract_custom_chars(font_file, chars_list, font_size, image_size, out_folder=None,
+                         name_mode='char', image_extension='png',
+                         bg_color=(255, 255, 255, 0), fg_color=(0, 0, 0, 255),
+                         is_skip=True, progress_callback=None):
+    """提取自定义字符列表"""
+
+    if out_folder is None:
+        out_folder = os.path.splitext(font_file)[0] + "_custom_images"
+
+    # 创建输出目录
+    os.makedirs(out_folder, exist_ok=True)
+
+    font_pil = ImageFont.truetype(font_file, font_size)
+
+    total_chars = len(chars_list)
+    success_count = 0
+    fail_count = 0
+    skip_count = 0
+
+    for i, char in enumerate(chars_list):
+        # 获取输出文件名
+        if name_mode == 'char':
+            # 处理文件名中的特殊字符
+            if char in ['/', '\\', ':', '*', '?', '"', '<', '>', '|'] or ord(char) < 32:
+                filename = f"char_{ord(char)}"
+            else:
+                filename = char
+        else:
+            filename = f"char_{ord(char)}"
+
+        filename = os.path.join(out_folder, f'{filename}.{image_extension}')
+
+        # 跳过已存在的文件
+        if is_skip and os.path.exists(filename):
+            print(f"⚠️ 跳过已存在: {os.path.basename(filename)}")
+            skip_count += 1
+            continue
+
+        # 生成图像
+        image = char_to_image(char, font_pil, image_size, bg_color, fg_color)
+        if image is None:
+            print(f"❌ 生成图像失败: '{char}'")
+            fail_count += 1
+            continue
+
+        # 保存图像
+        try:
+            image.save(filename)
+            success_count += 1
+            print(f"✅ 成功保存: '{char}' -> {os.path.basename(filename)}")
+        except Exception as e:
+            print(f"❌ 保存失败 '{char}': {e}")
+            fail_count += 1
+
+        # 更新进度
+        if progress_callback:
+            progress = (i + 1) / total_chars * 100
+            progress_callback(progress)
+
+    # 最终统计
+    print(f"\n=== 自定义字符处理完成 ===")
+    print(f"成功: {success_count}, 失败: {fail_count}, 跳过: {skip_count}")
+    print(f"文件保存在: {out_folder}")
 
 
 def font2image(font_file, font_size, image_size, out_folder=None,
