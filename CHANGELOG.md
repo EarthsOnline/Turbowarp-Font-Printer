@@ -35,3 +35,9 @@
 ||+|为提取模式增加了选择按钮
 |3.2|+|恢复了英文字母提取时产生的 other 文件夹
 ||+|为所有字符类型创建独立的文件夹
+
+### Release
+|Version|type|Dscription|
+|:-:|:-:|:-|
+|2.0|pre|对应 Fonts Printer.sb3 V2.0 的更新
+|2.1|pre|对应 Fonts Printer.sb3 V2.1 和 TTF2Png.py V3.1 的更新
