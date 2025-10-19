@@ -747,35 +747,59 @@ def font2image(font_file, font_size, image_size, out_folder=None,
     print(
         f"中文字符: {len(chinese_chars)}, 英文字符: {len(english_chars)}, 数字: {len(digit_chars)}, 符号: {len(symbol_chars)}")
 
-    # 智能创建文件夹：根据实际要提取的字符类型决定
+    # 为每种字符类型创建独立的文件夹
     folders_created = []
 
-    # 检查是否需要英文字母文件夹
+    # 中文文件夹
+    if (extract_all or extract_chinese) and chinese_chars:
+        chinese_folder = os.path.join(out_folder, "chinese")
+        os.makedirs(chinese_folder, exist_ok=True)
+        folders_created.append("chinese")
+        print(f"  - 中文字符: {chinese_folder}")
+
+    # 英文文件夹结构
     has_uppercase = any(extract_all or extract_english for code in chars_to_extract if 'A' <= chr(code) <= 'Z')
     has_lowercase = any(extract_all or extract_english for code in chars_to_extract if 'a' <= chr(code) <= 'z')
 
-    # 检查是否需要其他字符文件夹（中文、数字、符号等）
-    has_other = any(extract_all or extract_chinese or extract_digits or extract_symbols for code in chars_to_extract
-                    if not ('A' <= chr(code) <= 'Z' or 'a' <= chr(code) <= 'z'))
+    if (extract_all or extract_english) and english_chars:
+        english_folder = os.path.join(out_folder, "english")
+        os.makedirs(english_folder, exist_ok=True)
+        folders_created.append("english")
+        print(f"  - 英文字母: {english_folder}")
 
-    if has_uppercase:
-        uppercase_folder = os.path.join(out_folder, "uppercase")
-        os.makedirs(uppercase_folder, exist_ok=True)
-        folders_created.append("uppercase")
-        print(f"  - 大写字母: {uppercase_folder}")
+        # 英文子文件夹
+        if has_uppercase:
+            uppercase_folder = os.path.join(english_folder, "uppercase")
+            os.makedirs(uppercase_folder, exist_ok=True)
+            folders_created.append("english/uppercase")
+            print(f"    * 大写字母: {uppercase_folder}")
 
-    if has_lowercase:
-        lowercase_folder = os.path.join(out_folder, "lowercase")
-        os.makedirs(lowercase_folder, exist_ok=True)
-        folders_created.append("lowercase")
-        print(f"  - 小写字母: {lowercase_folder}")
+        if has_lowercase:
+            lowercase_folder = os.path.join(english_folder, "lowercase")
+            os.makedirs(lowercase_folder, exist_ok=True)
+            folders_created.append("english/lowercase")
+            print(f"    * 小写字母: {lowercase_folder}")
 
-    # 恢复 other 文件夹的创建
-    if has_other:
-        other_folder = os.path.join(out_folder, "other")
-        os.makedirs(other_folder, exist_ok=True)
-        folders_created.append("other")
-        print(f"  - 其他字符: {other_folder}")
+        if any(extract_all or extract_english for code in chars_to_extract
+               if not ('A' <= chr(code) <= 'Z' or 'a' <= chr(code) <= 'z')):
+            other_english_folder = os.path.join(english_folder, "other")
+            os.makedirs(other_english_folder, exist_ok=True)
+            folders_created.append("english/other")
+            print(f"    * 其他英文: {other_english_folder}")
+
+    # 数字文件夹
+    if (extract_all or extract_digits) and digit_chars:
+        digits_folder = os.path.join(out_folder, "digits")
+        os.makedirs(digits_folder, exist_ok=True)
+        folders_created.append("digits")
+        print(f"  - 数字: {digits_folder}")
+
+    # 符号文件夹
+    if (extract_all or extract_symbols) and symbol_chars:
+        symbols_folder = os.path.join(out_folder, "symbols")
+        os.makedirs(symbols_folder, exist_ok=True)
+        folders_created.append("symbols")
+        print(f"  - 符号: {symbols_folder}")
 
     print(f"创建的文件夹: {', '.join(folders_created)}")
 
@@ -794,20 +818,33 @@ def font2image(font_file, font_size, image_size, out_folder=None,
         char = chr(code)
 
         # 确定输出文件夹
-        if 'A' <= char <= 'Z' and has_uppercase:
-            target_folder = uppercase_folder
-            folder_type = "大写"
-        elif 'a' <= char <= 'z' and has_lowercase:
-            target_folder = lowercase_folder
-            folder_type = "小写"
-        elif has_other:
-            target_folder = other_folder
-            folder_type = "其他"
-        else:
-            # 如果对应的文件夹不存在，跳过这个字符
-            print(f"⚠️ 跳过字符 '{char}'，对应的文件夹不存在")
-            skip_count += 1
-            continue
+        target_folder = out_folder  # 默认主目录
+
+        # 中文字符
+        if code in chinese_chars and (extract_all or extract_chinese):
+            if (extract_all or extract_chinese) and chinese_chars:
+                target_folder = os.path.join(out_folder, "chinese")
+
+        # 英文字符
+        elif code in english_chars and (extract_all or extract_english):
+            if (extract_all or extract_english) and english_chars:
+                english_base = os.path.join(out_folder, "english")
+                if 'A' <= char <= 'Z' and has_uppercase:
+                    target_folder = os.path.join(english_base, "uppercase")
+                elif 'a' <= char <= 'z' and has_lowercase:
+                    target_folder = os.path.join(english_base, "lowercase")
+                else:
+                    target_folder = os.path.join(english_base, "other")
+
+        # 数字
+        elif code in digit_chars and (extract_all or extract_digits):
+            if (extract_all or extract_digits) and digit_chars:
+                target_folder = os.path.join(out_folder, "digits")
+
+        # 符号
+        elif code in symbol_chars and (extract_all or extract_symbols):
+            if (extract_all or extract_symbols) and symbol_chars:
+                target_folder = os.path.join(out_folder, "symbols")
 
         # 检查重复字符
         if duplicate_tracker.check_duplicate(char):
