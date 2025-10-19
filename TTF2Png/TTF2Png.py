@@ -36,9 +36,20 @@ class FontExtractorApp:
         ttk.Entry(output_frame, textvariable=self.output_path, width=50).pack(side=tk.LEFT, fill=tk.X, expand=True)
         ttk.Button(output_frame, text="浏览", command=self.browse_output).pack(side=tk.RIGHT, padx=(5, 0))
 
+        # 提取模式选择
+        mode_frame = ttk.LabelFrame(main_frame, text="提取模式", padding="5")
+        mode_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+
+        self.extract_mode = tk.StringVar(value="class")  # class: 分类提取, custom: 自定义提取
+
+        ttk.Radiobutton(mode_frame, text="分类提取", variable=self.extract_mode,
+                        value="class", command=self.on_mode_changed).grid(row=0, column=0, sticky=tk.W, pady=2)
+        ttk.Radiobutton(mode_frame, text="自定义提取", variable=self.extract_mode,
+                        value="custom", command=self.on_mode_changed).grid(row=0, column=1, sticky=tk.W, pady=2)
+
         # 参数设置
         params_frame = ttk.LabelFrame(main_frame, text="参数设置", padding="5")
-        params_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        params_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
 
         # 字体大小
         ttk.Label(params_frame, text="字体大小:").grid(row=0, column=0, sticky=tk.W, pady=2)
@@ -67,8 +78,8 @@ class FontExtractorApp:
                                                                                     pady=2, padx=(5, 0))
 
         # 字符类型选择
-        chars_frame = ttk.LabelFrame(main_frame, text="提取字符类型", padding="5")
-        chars_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        self.chars_frame = ttk.LabelFrame(main_frame, text="分类字符提取", padding="5")
+        self.chars_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
 
         self.extract_chinese = tk.BooleanVar(value=True)
         self.extract_english = tk.BooleanVar(value=True)
@@ -77,36 +88,42 @@ class FontExtractorApp:
         self.extract_all = tk.BooleanVar(value=False)
         self.extract_common_chinese = tk.BooleanVar(value=False)
 
-        ttk.Checkbutton(chars_frame, text="中文字符", variable=self.extract_chinese).grid(row=0, column=0, sticky=tk.W,
+        ttk.Checkbutton(self.chars_frame, text="中文字符", variable=self.extract_chinese).grid(row=0, column=0,
+                                                                                               sticky=tk.W,
+                                                                                               pady=2)
+        ttk.Checkbutton(self.chars_frame, text="英文字母", variable=self.extract_english).grid(row=0, column=1,
+                                                                                               sticky=tk.W,
+                                                                                               pady=2)
+        ttk.Checkbutton(self.chars_frame, text="数字", variable=self.extract_digits).grid(row=0, column=2, sticky=tk.W,
                                                                                           pady=2)
-        ttk.Checkbutton(chars_frame, text="英文字母", variable=self.extract_english).grid(row=0, column=1, sticky=tk.W,
-                                                                                          pady=2)
-        ttk.Checkbutton(chars_frame, text="数字", variable=self.extract_digits).grid(row=0, column=2, sticky=tk.W,
-                                                                                     pady=2)
-        ttk.Checkbutton(chars_frame, text="符号", variable=self.extract_symbols).grid(row=1, column=0, sticky=tk.W,
-                                                                                      pady=2)
-        ttk.Checkbutton(chars_frame, text="全部字符", variable=self.extract_all,
+        ttk.Checkbutton(self.chars_frame, text="符号", variable=self.extract_symbols).grid(row=1, column=0, sticky=tk.W,
+                                                                                           pady=2)
+        ttk.Checkbutton(self.chars_frame, text="全部字符", variable=self.extract_all,
                         command=self.toggle_all_chars).grid(row=1, column=1, sticky=tk.W, pady=2)
-        ttk.Checkbutton(chars_frame, text="仅常用汉字", variable=self.extract_common_chinese,
+        ttk.Checkbutton(self.chars_frame, text="仅常用汉字", variable=self.extract_common_chinese,
                         command=self.toggle_common_chinese).grid(row=1, column=2, sticky=tk.W, pady=2)
 
-        # 常用汉字级别选择 - 已删除选择列表，保留复选框功能
+        # 分类提取按钮
+        self.class_extract_button = ttk.Button(self.chars_frame, text="开始分类提取",
+                                               command=self.start_class_extraction)
+        self.class_extract_button.grid(row=2, column=0, columnspan=3, pady=5)
 
         # 自定义字符提取
-        custom_frame = ttk.LabelFrame(main_frame, text="自定义字符提取", padding="5")
-        custom_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        self.custom_frame = ttk.LabelFrame(main_frame, text="自定义字符提取", padding="5")
+        self.custom_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
 
         # 单字符输入
-        ttk.Label(custom_frame, text="单个字符:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        ttk.Label(self.custom_frame, text="单个字符:").grid(row=0, column=0, sticky=tk.W, pady=2)
         self.single_char = tk.StringVar()
-        ttk.Entry(custom_frame, textvariable=self.single_char, width=10).grid(row=0, column=1, sticky=tk.W, pady=2,
-                                                                              padx=(5, 0))
-        ttk.Button(custom_frame, text="添加到列表", command=self.add_to_list).grid(row=0, column=2, sticky=tk.W, pady=2,
-                                                                                   padx=(5, 0))
+        self.single_char_entry = ttk.Entry(self.custom_frame, textvariable=self.single_char, width=10)
+        self.single_char_entry.grid(row=0, column=1, sticky=tk.W, pady=2, padx=(5, 0))
+
+        self.add_button = ttk.Button(self.custom_frame, text="添加到列表", command=self.add_to_list)
+        self.add_button.grid(row=0, column=2, sticky=tk.W, pady=2, padx=(5, 0))
 
         # 字符列表
-        ttk.Label(custom_frame, text="字符列表:").grid(row=1, column=0, sticky=tk.W, pady=2)
-        list_frame = ttk.Frame(custom_frame)
+        ttk.Label(self.custom_frame, text="字符列表:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        list_frame = ttk.Frame(self.custom_frame)
         list_frame.grid(row=1, column=1, columnspan=2, sticky=(tk.W, tk.E), pady=2)
 
         self.char_listbox = tk.Listbox(list_frame, height=4)
@@ -117,32 +134,36 @@ class FontExtractorApp:
         self.char_listbox.config(yscrollcommand=scrollbar.set)
 
         # 列表操作按钮
-        list_buttons_frame = ttk.Frame(custom_frame)
+        list_buttons_frame = ttk.Frame(self.custom_frame)
         list_buttons_frame.grid(row=2, column=1, columnspan=2, sticky=tk.W, pady=2)
 
-        ttk.Button(list_buttons_frame, text="删除选中", command=self.delete_selected).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(list_buttons_frame, text="清空列表", command=self.clear_list).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(list_buttons_frame, text="提取列表", command=self.extract_list).pack(side=tk.LEFT)
+        self.delete_button = ttk.Button(list_buttons_frame, text="删除选中", command=self.delete_selected)
+        self.delete_button.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.clear_button = ttk.Button(list_buttons_frame, text="清空列表", command=self.clear_list)
+        self.clear_button.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.custom_extract_button = ttk.Button(list_buttons_frame, text="开始自定义提取", command=self.extract_list)
+        self.custom_extract_button.pack(side=tk.LEFT)
 
         # 跳过已存在文件
         self.skip_existing = tk.BooleanVar(value=True)
-        ttk.Checkbutton(main_frame, text="跳过已存在的文件", variable=self.skip_existing).grid(row=5, column=0,
+        ttk.Checkbutton(main_frame, text="跳过已存在的文件", variable=self.skip_existing).grid(row=6, column=0,
                                                                                                columnspan=3,
                                                                                                sticky=tk.W, pady=5)
 
         # 进度条
         self.progress = ttk.Progressbar(main_frame, mode='determinate')
-        self.progress.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        self.progress.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
 
         # 状态标签
         self.status = tk.StringVar(value="准备就绪")
-        ttk.Label(main_frame, textvariable=self.status).grid(row=7, column=0, columnspan=3, sticky=tk.W, pady=5)
+        ttk.Label(main_frame, textvariable=self.status).grid(row=8, column=0, columnspan=3, sticky=tk.W, pady=5)
 
         # 按钮
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=8, column=0, columnspan=3, pady=10)
+        button_frame.grid(row=9, column=0, columnspan=3, pady=10)
 
-        ttk.Button(button_frame, text="开始提取", command=self.start_extraction).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="清空状态", command=self.clear_status).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="退出", command=self.root.quit).pack(side=tk.LEFT)
 
@@ -150,6 +171,44 @@ class FontExtractorApp:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
+
+        # 初始化模式状态
+        self.on_mode_changed()
+
+    def on_mode_changed(self):
+        """当提取模式改变时调用"""
+        if self.extract_mode.get() == "class":
+            # 启用分类提取，禁用自定义提取
+            self.enable_class_section()
+            self.disable_custom_section()
+        else:
+            # 启用自定义提取，禁用分类提取
+            self.enable_custom_section()
+            self.disable_class_section()
+
+    def enable_class_section(self):
+        """启用分类提取区域"""
+        for widget in self.chars_frame.winfo_children():
+            if isinstance(widget, (ttk.Checkbutton, ttk.Button)):
+                widget.configure(state='normal')
+
+    def disable_class_section(self):
+        """禁用分类提取区域"""
+        for widget in self.chars_frame.winfo_children():
+            if isinstance(widget, (ttk.Checkbutton, ttk.Button)):
+                widget.configure(state='disabled')
+
+    def enable_custom_section(self):
+        """启用自定义提取区域"""
+        for widget in self.custom_frame.winfo_children():
+            if isinstance(widget, (ttk.Entry, ttk.Button, tk.Listbox)):
+                widget.configure(state='normal')
+
+    def disable_custom_section(self):
+        """禁用自定义提取区域"""
+        for widget in self.custom_frame.winfo_children():
+            if isinstance(widget, (ttk.Entry, ttk.Button, tk.Listbox)):
+                widget.configure(state='disabled')
 
     def browse_font(self):
         filename = filedialog.askopenfilename(
@@ -178,7 +237,7 @@ class FontExtractorApp:
         else:
             state = 'normal'
 
-        for widget in self.root.winfo_children():
+        for widget in self.chars_frame.winfo_children():
             if isinstance(widget, ttk.Checkbutton):
                 text = widget.cget('text')
                 if text not in ["全部字符", "仅常用汉字"]:
@@ -192,13 +251,13 @@ class FontExtractorApp:
             self.extract_symbols.set(False)
             self.extract_all.set(False)
 
-            for widget in self.root.winfo_children():
+            for widget in self.chars_frame.winfo_children():
                 if isinstance(widget, ttk.Checkbutton):
                     text = widget.cget('text')
                     if text not in ["中文字符", "仅常用汉字"]:
                         widget.configure(state='disabled')
         else:
-            for widget in self.root.winfo_children():
+            for widget in self.chars_frame.winfo_children():
                 if isinstance(widget, ttk.Checkbutton):
                     widget.configure(state='normal')
 
@@ -228,7 +287,54 @@ class FontExtractorApp:
     def clear_list(self):
         self.char_listbox.delete(0, tk.END)
 
+    def start_class_extraction(self):
+        """开始分类提取"""
+        if not self.font_path.get():
+            messagebox.showerror("错误", "请选择字体文件")
+            return
+
+        if not self.output_path.get():
+            messagebox.showerror("错误", "请选择输出目录")
+            return
+
+        # 检查是否选择了任何提取选项
+        if not (self.extract_all.get() or self.extract_common_chinese.get() or
+                self.extract_chinese.get() or self.extract_english.get() or
+                self.extract_digits.get() or self.extract_symbols.get()):
+            messagebox.showerror("错误", "请至少选择一种字符类型进行提取")
+            return
+
+        try:
+            self.status.set("正在提取字符...")
+            self.root.update()
+
+            font2image(
+                font_file=self.font_path.get(),
+                font_size=self.font_size.get(),
+                image_size=self.image_size.get(),
+                out_folder=self.output_path.get(),
+                name_mode=self.name_mode.get(),
+                image_extension=self.image_format.get(),
+                extract_chinese=self.extract_chinese.get(),
+                extract_english=self.extract_english.get(),
+                extract_digits=self.extract_digits.get(),
+                extract_symbols=self.extract_symbols.get(),
+                extract_all=self.extract_all.get(),
+                extract_common_chinese=self.extract_common_chinese.get(),
+                common_chinese_level="常用3500",  # 固定值
+                is_skip=self.skip_existing.get(),
+                progress_callback=self.update_progress
+            )
+
+            self.status.set("提取完成！")
+            messagebox.showinfo("完成", "字符提取完成！")
+
+        except Exception as e:
+            self.status.set(f"错误: {str(e)}")
+            messagebox.showerror("错误", f"提取过程中出现错误:\n{str(e)}")
+
     def extract_list(self):
+        """开始自定义提取"""
         chars = self.char_listbox.get(0, tk.END)
         if not chars:
             messagebox.showwarning("警告", "字符列表为空")
@@ -269,44 +375,6 @@ class FontExtractorApp:
     def clear_status(self):
         self.status.set("准备就绪")
         self.progress['value'] = 0
-
-    def start_extraction(self):
-        if not self.font_path.get():
-            messagebox.showerror("错误", "请选择字体文件")
-            return
-
-        if not self.output_path.get():
-            messagebox.showerror("错误", "请选择输出目录")
-            return
-
-        try:
-            self.status.set("正在提取字符...")
-            self.root.update()
-
-            font2image(
-                font_file=self.font_path.get(),
-                font_size=self.font_size.get(),
-                image_size=self.image_size.get(),
-                out_folder=self.output_path.get(),
-                name_mode=self.name_mode.get(),
-                image_extension=self.image_format.get(),
-                extract_chinese=self.extract_chinese.get(),
-                extract_english=self.extract_english.get(),
-                extract_digits=self.extract_digits.get(),
-                extract_symbols=self.extract_symbols.get(),
-                extract_all=self.extract_all.get(),
-                extract_common_chinese=self.extract_common_chinese.get(),
-                common_chinese_level="常用3500",  # 固定值
-                is_skip=self.skip_existing.get(),
-                progress_callback=self.update_progress
-            )
-
-            self.status.set("提取完成！")
-            messagebox.showinfo("完成", "字符提取完成！")
-
-        except Exception as e:
-            self.status.set(f"错误: {str(e)}")
-            messagebox.showerror("错误", f"提取过程中出现错误:\n{str(e)}")
 
     def update_progress(self, value):
         self.progress['value'] = value
@@ -559,10 +627,11 @@ def extract_custom_chars(font_file, chars_list, font_size, image_size, out_folde
     """提取自定义字符列表"""
 
     if out_folder is None:
-        out_folder = os.path.splitext(font_file)[0] + "_custom_images"
+        out_folder = os.path.splitext(font_file)[0] + "_images"
 
-    # 创建输出目录
-    os.makedirs(out_folder, exist_ok=True)
+    # 创建自定义输出目录
+    custom_folder = os.path.join(out_folder, "custom")
+    os.makedirs(custom_folder, exist_ok=True)
 
     font_pil = ImageFont.truetype(font_file, font_size)
 
@@ -582,7 +651,7 @@ def extract_custom_chars(font_file, chars_list, font_size, image_size, out_folde
         else:
             filename = f"char_{ord(char)}"
 
-        filename = os.path.join(out_folder, f'{filename}.{image_extension}')
+        filename = os.path.join(custom_folder, f'{filename}.{image_extension}')
 
         # 跳过已存在的文件
         if is_skip and os.path.exists(filename):
@@ -614,7 +683,7 @@ def extract_custom_chars(font_file, chars_list, font_size, image_size, out_folde
     # 最终统计
     print(f"\n=== 自定义字符处理完成 ===")
     print(f"成功: {success_count}, 失败: {fail_count}, 跳过: {skip_count}")
-    print(f"文件保存在: {out_folder}")
+    print(f"文件保存在: {custom_folder}")
 
 
 def font2image(font_file, font_size, image_size, out_folder=None,
@@ -684,6 +753,8 @@ def font2image(font_file, font_size, image_size, out_folder=None,
     # 检查是否需要英文字母文件夹
     has_uppercase = any(extract_all or extract_english for code in chars_to_extract if 'A' <= chr(code) <= 'Z')
     has_lowercase = any(extract_all or extract_english for code in chars_to_extract if 'a' <= chr(code) <= 'z')
+
+    # 检查是否需要其他字符文件夹（中文、数字、符号等）
     has_other = any(extract_all or extract_chinese or extract_digits or extract_symbols for code in chars_to_extract
                     if not ('A' <= chr(code) <= 'Z' or 'a' <= chr(code) <= 'z'))
 
@@ -699,6 +770,7 @@ def font2image(font_file, font_size, image_size, out_folder=None,
         folders_created.append("lowercase")
         print(f"  - 小写字母: {lowercase_folder}")
 
+    # 恢复 other 文件夹的创建
     if has_other:
         other_folder = os.path.join(out_folder, "other")
         os.makedirs(other_folder, exist_ok=True)
@@ -753,9 +825,6 @@ def font2image(font_file, font_size, image_size, out_folder=None,
             filename = f"char_{code}"
 
         filename = os.path.join(target_folder, f'{filename}.{image_extension}')
-
-        # 调试信息
-        # print(f"处理: '{char}' ({folder_type}) -> {os.path.basename(filename)}")
 
         # 跳过已存在的文件
         if is_skip and os.path.exists(filename):
